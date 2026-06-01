@@ -1,6 +1,7 @@
 import time
 import sys
 import signal
+import platform
 import numpy as np
 import mujoco
 import mujoco.viewer
@@ -11,9 +12,6 @@ import control as ct
 import zmq
 import struct
 
-signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-np.set_printoptions(precision=5)
-
 ## ZMQ
 ctx = zmq.Context()
 sock = ctx.socket(zmq.PUB)
@@ -21,6 +19,14 @@ sock.bind("tcp://127.0.0.1:5555")
 sock_u = ctx.socket(zmq.SUB)
 sock_u.connect("tcp://127.0.0.1:5556")
 sock_u.setsockopt(zmq.SUBSCRIBE, b"")
+
+if platform.system() == 'Windows':
+    # Windows: Set linger to 0 to avoid hanging
+    sock.setsockopt(zmq.LINGER, 0)
+    sock_u.setsockopt(zmq.LINGER, 0)
+else:
+    # Unix: Handle SIGPIPE
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
 MODEL = 'segway.xml'
