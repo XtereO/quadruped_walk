@@ -1,0 +1,170 @@
+<mujoco model="quadruped_dog_legs">
+  <compiler angle="radian" autolimits="true"/>
+
+  <option cone="elliptic" impratio="100"/>
+
+  <default>
+    <joint armature="0.01" damping="2" frictionloss="0.1"/>
+    <geom friction="0.6" margin="0.001" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+    <position kp="100" forcerange="-33.5 33.5"/>
+  </default>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" 
+      rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <material name="body_mat" rgba="0.3 0.5 0.7 1" specular="0.4"/>
+    <material name="leg_mat" rgba="0.5 0.3 0.2 1" specular="0.3"/>
+    <material name="foot_mat" rgba="0.2 0.2 0.2 1" specular="0.1"/>
+  </asset>
+
+  <worldbody>
+    <camera name="side_cam" pos="0 -30 1" xyaxes="1 0 0 0 0 1"/>
+    <camera name="top_cam" pos="0 0 5" xyaxes="1 0 0 0 1 0"/>
+    <camera name="front_cam" pos="0 3 1" xyaxes="1 0 0 0 0 1"/>
+    <camera name="iso_cam" pos="3 3 2" xyaxes="-1 1 0 -0.5 -0.5 1"/>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+
+    <!-- Main body (trunk) -->
+    <body name="trunk" pos="0 0 0.25">
+      <freejoint/>
+
+      <inertial mass="5.0" pos="0 0 0" diaginertia="0.05 0.08 0.08"/>
+
+      <!-- Visual: box -->
+      <geom name="trunk_vis" type="box" size="0.28 0.14 0.08" material="body_mat" group="0"/>
+      <geom name="trunk_col" type="box" size="0.28 0.14 0.08" group="3" contype="1" conaffinity="1"/>
+
+      <!-- ==================== FR LEG (Front Right) ==================== -->
+      <body name="FR_hip" pos="0.20 -0.09 0">
+        <!-- Abduction joint - LIMITED to prevent frog-like spreading -->
+        <joint name="FR_hip_joint" type="hinge" axis="0 0 1" range="-0.1 0.1" damping="2" stiffness="100"/>
+        <inertial mass="0.5" pos="0 0 0" diaginertia="0.01 0.01 0.01"/>
+        <geom name="FR_hip_vis" type="cylinder" size="0.03 0.03" fromto="0 0 0 0 0 -0.02" material="leg_mat"/>
+        
+        <!-- Thigh: moves FORWARD/BACKWARD (sagittal plane) -->
+        <body name="FR_thigh" pos="0 0 -0.02">
+          <joint name="FR_thigh_joint" type="hinge" axis="0 1 0" range="-0.2 1.0" damping="1"/>
+          <inertial mass="0.8" pos="0.05 0 -0.08" diaginertia="0.02 0.02 0.01"/>
+          <geom name="FR_thigh_vis" type="capsule" size="0.022" fromto="0 0 0 0.10 0 -0.10" material="leg_mat"/>
+          <geom name="FR_thigh_col" type="capsule" size="0.018" fromto="0 0 0 0.10 0 -0.10" group="3" contype="1" conaffinity="1"/>
+          
+          <!-- Calf: moves BACKWARD/FORWARD -->
+          <body name="FR_calf" pos="0.10 0 -0.10">
+            <joint name="FR_calf_joint" type="hinge" axis="0 1 0" range="-1.2 0.3" damping="0.8"/>
+            <inertial mass="0.4" pos="-0.04 0 -0.06" diaginertia="0.008 0.008 0.004"/>
+            <geom name="FR_calf_vis" type="capsule" size="0.016" fromto="0 0 0 -0.08 0 -0.10" material="leg_mat"/>
+            <geom name="FR_calf_col" type="capsule" size="0.013" fromto="0 0 0 -0.08 0 -0.10" group="3" contype="1" conaffinity="1"/>
+            
+            <!-- Foot -->
+            <geom name="FR_foot_vis" type="sphere" size="0.02" pos="-0.08 0 -0.10" material="foot_mat"/>
+            <geom name="FR_foot_col" type="sphere" size="0.02" pos="-0.08 0 -0.10" group="3" contype="1" conaffinity="1" friction="0.8"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== FL LEG (Front Left) ==================== -->
+      <body name="FL_hip" pos="0.20 0.09 0">
+        <joint name="FL_hip_joint" type="hinge" axis="0 0 1" range="-0.1 0.1" damping="2" stiffness="100"/>
+        <inertial mass="0.5" pos="0 0 0" diaginertia="0.01 0.01 0.01"/>
+        <geom name="FL_hip_vis" type="cylinder" size="0.03 0.03" fromto="0 0 0 0 0 -0.02" material="leg_mat"/>
+        
+        <body name="FL_thigh" pos="0 0 -0.02">
+          <joint name="FL_thigh_joint" type="hinge" axis="0 1 0" range="-0.2 1.0" damping="1"/>
+          <inertial mass="0.8" pos="0.05 0 -0.08" diaginertia="0.02 0.02 0.01"/>
+          <geom name="FL_thigh_vis" type="capsule" size="0.022" fromto="0 0 0 0.10 0 -0.10" material="leg_mat"/>
+          <geom name="FL_thigh_col" type="capsule" size="0.018" fromto="0 0 0 0.10 0 -0.10" group="3" contype="1" conaffinity="1"/>
+          
+          <body name="FL_calf" pos="0.10 0 -0.10">
+            <joint name="FL_calf_joint" type="hinge" axis="0 1 0" range="-1.2 0.3" damping="0.8"/>
+            <inertial mass="0.4" pos="-0.04 0 -0.06" diaginertia="0.008 0.008 0.004"/>
+            <geom name="FL_calf_vis" type="capsule" size="0.016" fromto="0 0 0 -0.08 0 -0.10" material="leg_mat"/>
+            <geom name="FL_calf_col" type="capsule" size="0.013" fromto="0 0 0 -0.08 0 -0.10" group="3" contype="1" conaffinity="1"/>
+            
+            <geom name="FL_foot_vis" type="sphere" size="0.02" pos="-0.08 0 -0.10" material="foot_mat"/>
+            <geom name="FL_foot_col" type="sphere" size="0.02" pos="-0.08 0 -0.10" group="3" contype="1" conaffinity="1" friction="0.8"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== RR LEG (Rear Right) ==================== -->
+      <body name="RR_hip" pos="-0.20 -0.09 0">
+        <joint name="RR_hip_joint" type="hinge" axis="0 0 1" range="-0.1 0.1" damping="2" stiffness="100"/>
+        <inertial mass="0.5" pos="0 0 0" diaginertia="0.01 0.01 0.01"/>
+        <geom name="RR_hip_vis" type="cylinder" size="0.03 0.03" fromto="0 0 0 0 0 -0.02" material="leg_mat"/>
+        
+        <body name="RR_thigh" pos="0 0 -0.02">
+          <joint name="RR_thigh_joint" type="hinge" axis="0 1 0" range="-0.2 1.0" damping="1"/>
+          <inertial mass="0.8" pos="0.05 0 -0.08" diaginertia="0.02 0.02 0.01"/>
+          <geom name="RR_thigh_vis" type="capsule" size="0.022" fromto="0 0 0 0.10 0 -0.10" material="leg_mat"/>
+          <geom name="RR_thigh_col" type="capsule" size="0.018" fromto="0 0 0 0.10 0 -0.10" group="3" contype="1" conaffinity="1"/>
+          
+          <body name="RR_calf" pos="0.10 0 -0.10">
+            <joint name="RR_calf_joint" type="hinge" axis="0 1 0" range="-1.2 0.3" damping="0.8"/>
+            <inertial mass="0.4" pos="-0.04 0 -0.06" diaginertia="0.008 0.008 0.004"/>
+            <geom name="RR_calf_vis" type="capsule" size="0.016" fromto="0 0 0 -0.08 0 -0.10" material="leg_mat"/>
+            <geom name="RR_calf_col" type="capsule" size="0.013" fromto="0 0 0 -0.08 0 -0.10" group="3" contype="1" conaffinity="1"/>
+            
+            <geom name="RR_foot_vis" type="sphere" size="0.02" pos="-0.08 0 -0.10" material="foot_mat"/>
+            <geom name="RR_foot_col" type="sphere" size="0.02" pos="-0.08 0 -0.10" group="3" contype="1" conaffinity="1" friction="0.8"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== RL LEG (Rear Left) ==================== -->
+      <body name="RL_hip" pos="-0.20 0.09 0">
+        <joint name="RL_hip_joint" type="hinge" axis="0 0 1" range="-0.1 0.1" damping="2" stiffness="100"/>
+        <inertial mass="0.5" pos="0 0 0" diaginertia="0.01 0.01 0.01"/>
+        <geom name="RL_hip_vis" type="cylinder" size="0.03 0.03" fromto="0 0 0 0 0 -0.02" material="leg_mat"/>
+        
+        <body name="RL_thigh" pos="0 0 -0.02">
+          <joint name="RL_thigh_joint" type="hinge" axis="0 1 0" range="-0.2 1.0" damping="1"/>
+          <inertial mass="0.8" pos="0.05 0 -0.08" diaginertia="0.02 0.02 0.01"/>
+          <geom name="RL_thigh_vis" type="capsule" size="0.022" fromto="0 0 0 0.10 0 -0.10" material="leg_mat"/>
+          <geom name="RL_thigh_col" type="capsule" size="0.018" fromto="0 0 0 0.10 0 -0.10" group="3" contype="1" conaffinity="1"/>
+          
+          <body name="RL_calf" pos="0.10 0 -0.10">
+            <joint name="RL_calf_joint" type="hinge" axis="0 1 0" range="-1.2 0.3" damping="0.8"/>
+            <inertial mass="0.4" pos="-0.04 0 -0.06" diaginertia="0.008 0.008 0.004"/>
+            <geom name="RL_calf_vis" type="capsule" size="0.016" fromto="0 0 0 -0.08 0 -0.10" material="leg_mat"/>
+            <geom name="RL_calf_col" type="capsule" size="0.013" fromto="0 0 0 -0.08 0 -0.10" group="3" contype="1" conaffinity="1"/>
+            
+            <geom name="RL_foot_vis" type="sphere" size="0.02" pos="-0.08 0 -0.10" material="foot_mat"/>
+            <geom name="RL_foot_col" type="sphere" size="0.02" pos="-0.08 0 -0.10" group="3" contype="1" conaffinity="1" friction="0.8"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- Hip abduction actuators - limited range -->
+    <position name="FR_hip_act" joint="FR_hip_joint" kp="80" forcerange="-10 10"/>
+    <position name="FL_hip_act" joint="FL_hip_joint" kp="80" forcerange="-10 10"/>
+    <position name="RR_hip_act" joint="RR_hip_joint" kp="80" forcerange="-10 10"/>
+    <position name="RL_hip_act" joint="RL_hip_joint" kp="80" forcerange="-10 10"/>
+
+    <!-- Thigh actuators -->
+    <position name="FR_thigh_act" joint="FR_thigh_joint" kp="120"/>
+    <position name="FL_thigh_act" joint="FL_thigh_joint" kp="120"/>
+    <position name="RR_thigh_act" joint="RR_thigh_joint" kp="120"/>
+    <position name="RL_thigh_act" joint="RL_thigh_joint" kp="120"/>
+
+    <!-- Calf actuators -->
+    <position name="FR_calf_act" joint="FR_calf_joint" kp="100"/>
+    <position name="FL_calf_act" joint="FL_calf_joint" kp="100"/>
+    <position name="RR_calf_act" joint="RR_calf_joint" kp="100"/>
+    <position name="RL_calf_act" joint="RL_calf_joint" kp="100"/>
+  </actuator>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0.25 1 0 0 0  0 0.4 -0.6  0 0.4 -0.6  0 0.4 -0.6  0 0.4 -0.6"/>
+  </keyframe>
+</mujoco>
