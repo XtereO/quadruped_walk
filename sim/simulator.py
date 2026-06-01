@@ -29,7 +29,7 @@ m = mujoco.MjModel.from_xml_path(MODEL)
 d = mujoco.MjData(m)
 
 
-with mujoco.viewer.launch_passive(m, d, show_left_ui=True, show_right_ui=False) as viewer:
+with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False) as viewer:
     
     viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
     viewer.cam.fixedcamid = m.camera("side_cam").id

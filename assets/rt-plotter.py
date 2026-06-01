@@ -71,14 +71,14 @@ def update():
             ti, th, dth, ps, dps = struct.unpack(FMT, msg)
 
             msg_u = sock_u.recv(zmq.NOBLOCK)
-            ti, ui = struct.unpack("df", msg_u)
+            ti, ul, ur = struct.unpack("dff", msg_u)
 
             t_buf.append(ti)
             theta.append(th)
             dtheta.append(dth)
             psi.append(ps)
             dpsi.append(dps)
-            u.append(ui)
+            u.append(ul)
 
             updated = True
         except zmq.Again:

@@ -35,6 +35,8 @@ To simulate with mujoco (with system state vizualizetion)
 python simulator.py & python rt-plotter.py
 ```
 
+Note. For ubuntu 26.04 and wayland use `PYGLFW_LIBRARY_VARIANT=wayland python simulator.py`
+
 Examples of controllers:
 
 1. LQR with standup
