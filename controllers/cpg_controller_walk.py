@@ -284,14 +284,21 @@ class CPGQuadruped2D:
             thigh_cmd -= pitch_correction * 0.25
         
         # Add height correction
-        thigh_cmd += height_correction * 0.1 #0.2
-        calf_cmd += height_correction * 0.5 #0.1
+        thigh_cmd += height_correction * 0.1
+        calf_cmd += height_correction * 0.5
         
+        '''
         # Hip joint
         hip_cmd = pitch_correction * 0.05
-        yaw_correction = -state['body_yaw_rate'] * 0.1 - state['body_yaw'] * 0.05
-        hip_cmd += yaw_correction
-        
+        y_correction = -state['body_y'] * 0.05  # Turn towards Y=0
+        y_correction = np.clip(y_correction, -0.1, 0.1)
+        if leg in ['FR', 'RR']:  # Right legs
+            hip_cmd += y_correction
+        else:  # Left legs
+            hip_cmd -= y_correction
+        '''
+        hip_cmd=0
+
         return hip_cmd, thigh_cmd, calf_cmd
     
     def compute_control(self, state):
