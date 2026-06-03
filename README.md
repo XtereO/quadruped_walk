@@ -23,14 +23,18 @@ At the end we have understood that this is a difficult job to make a control for
 ![alt text](docs/quadruped_walk.png)
 
 ## Install
-
+For Ubuntu:
 ```bash
 python3 -m venv ./venv
-source venv/bin/activate
+source venv/bin/activate 
 pip install -r requirements.txt
+```
 
-sudo apt-get install build-essential cmake git libzmq3-dev libeigen3-dev 
-
+For Windows:
+```bash
+python3 -m venv ./venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 In case there's pip Timeout Error and you live in Russia:
