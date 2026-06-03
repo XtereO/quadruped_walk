@@ -7,20 +7,15 @@ import struct
 import numpy as np
 import control as ct
 
-# ZMQ Setup with Windows fix
 ctx = zmq.Context()
 
-# SUB socket (receives state from simulator)
 sock_state = ctx.socket(zmq.SUB)
 sock_state.connect("tcp://127.0.0.1:5555")
 sock_state.setsockopt(zmq.SUBSCRIBE, b"")
-sock_state.setsockopt(zmq.RCVTIMEO, 100)  # 100ms timeout
-
-# PUB socket (sends control to simulator)
+sock_state.setsockopt(zmq.RCVTIMEO, 100) 
 sock_u = ctx.socket(zmq.PUB)
 sock_u.bind("tcp://127.0.0.1:5556")
 
-# Windows-specific socket settings
 if platform.system() == 'Windows':
     sock_state.setsockopt(zmq.LINGER, 0)
     sock_u.setsockopt(zmq.LINGER, 0)
@@ -29,8 +24,8 @@ else:
 
 class CPGQuadruped2D:
     def __init__(self):
-        # Gait parameters - softer, more natural movement
-        self.gait_frequency = 1.1  # Hz (slower for smoother motion)
+        # Gait parameters
+        self.gait_frequency = 1.1  # Hz (less Hz, smoother motion)
         self.stride_amplitude = 0.32  # Radians (moderate step size)
         self.step_height = 0.22  # Radians (moderate foot lift)
         
@@ -53,16 +48,15 @@ class CPGQuadruped2D:
             'RL': {'hip': 0.0, 'thigh': 0.3, 'calf': -0.5}
         }
         
-        # Joint limits
         self.joint_limits = {
             'hip': (-0.08, 0.08),
             'thigh': (-0.2, 0.8),
             'calf': (-1.0, 0.2)
         }
         
-        # Soft motion parameters
-        self.acceleration_limit = 1.0  # rad/s^2 (limits joint acceleration)
-        self.velocity_limit = 2.0     # rad/s (limits joint velocity)
+        # Soft motion parameters: limits of joints 
+        self.acceleration_limit = 1.0  # rad/s^2
+        self.velocity_limit = 2.0     # rad/s
         
         # Previous commands for smoothing
         self.prev_thigh_cmd = {leg: 0.3 for leg in self.leg_names}
@@ -72,9 +66,9 @@ class CPGQuadruped2D:
         # PID for body height (softer gains)
         self.height_error_integral = 0
         self.last_height_error = 0
-        self.height_kp = 1.8   # Reduced for softer response
-        self.height_ki = 0.15  # Reduced
-        self.height_kd = 0.5   # Reduced
+        self.height_kp = 1.8   
+        self.height_ki = 0.15  
+        self.height_kd = 0.5   
         
         # Desired states
         self.desired_height = 0.22
@@ -89,19 +83,12 @@ class CPGQuadruped2D:
         self.last_print_time = 0
         self.last_dt = 0.005
 
-
-        # PID for pitch stabilization (softer gains)
-        self.pitch_error_integral = 0
-        self.last_pitch_error = 0
-        self.pitch_kp = 1.0    # Reduced for softer response
-        self.pitch_ki = 0.3    # Reduced
-        self.pitch_kd = 0.5    # Reduced
-
         # LQR gains (tuned for quadruped)
-        self.K_pitch = np.array([-1.5, -0.5])  # [Kp, Kd] equivalent but optimal
+
         # Add integrator for steady-state error
         self.pitch_integral = 0
         self.pitch_integral_gain = 0.15
+        
         # Simplified pitch dynamics (pendulum model)
         # I * theta_ddot + m*g*h * theta = torque
         I = 0.06  # Moment of inertia (kg*m²) - from your XML
@@ -145,14 +132,12 @@ class CPGQuadruped2D:
                 'body_yaw_rate': data[12],
             }
             
-            # Joint positions
             state['joints'] = {}
             joint_names = ['FR_hip', 'FR_thigh', 'FR_calf',
                           'FL_hip', 'FL_thigh', 'FL_calf',
                           'RR_hip', 'RR_thigh', 'RR_calf',
                           'RL_hip', 'RL_thigh', 'RL_calf']
             
-            # is it right mapping to legs?
             for i, name in enumerate(joint_names):
                 state['joints'][name] = data[13 + i]
             
@@ -188,15 +173,12 @@ class CPGQuadruped2D:
         """Soft PID controller for body height"""
         error = self.desired_height - current_height
         
-        # P term
         p = self.height_kp * error
         
-        # I term (with anti-windup)
         self.height_error_integral += error * dt
         self.height_error_integral = np.clip(self.height_error_integral, -0.08, 0.08)
         i = self.height_ki * self.height_error_integral
         
-        # D term
         d = self.height_kd * (error - self.last_height_error) / dt if dt > 0 else 0
         self.last_height_error = error
         
@@ -205,10 +187,7 @@ class CPGQuadruped2D:
     
     def pitch_control(self, pitch, pitch_rate, dt):
         """LQR controller for body pitch - more stable than PID"""
-        # State vector
         x = np.array([pitch, pitch_rate])
-    
-        # LQR control law: u = -K * x
         correction = -np.dot(self.K_pitch, x)
     
         # Add integral term to eliminate steady-state error
@@ -216,26 +195,7 @@ class CPGQuadruped2D:
         self.pitch_integral = np.clip(self.pitch_integral, -0.1, 0.1)
         correction += self.pitch_integral_gain * self.pitch_integral
     
-        # Limit output
         return np.clip(correction, -0.3, 0.3)
-        """Soft PID controller for body pitch"""
-        error = -pitch
-        
-        # P term
-        p = self.pitch_kp * error
-        
-        # I term
-        self.pitch_error_integral += error * dt
-        self.pitch_error_integral = np.clip(self.pitch_error_integral, -0.08, 0.08)
-        i = self.pitch_ki * self.pitch_error_integral
-        
-        # D term
-        d = self.pitch_kd * (error - self.last_pitch_error) / dt if dt > 0 else 0
-        self.last_pitch_error = error
-        
-        correction = p + i + d
-        return np.clip(correction, -0.2, 0.2)
-    
 
     def compute_gait(self, leg, t, height_correction, pitch_correction, velocity_factor, state):
         """Compute joint angles with smooth transitions"""
@@ -251,11 +211,7 @@ class CPGQuadruped2D:
             side_factor = 1.0 + state['body_yaw'] * 0.5
     
         thigh_offset = self.stride_amplitude * velocity_factor * side_factor
-        #thigh_offset = self.stride_amplitude * velocity_factor
-        
-        # Smoother motion using sine squared for softer foot placement
-        smooth_factor = math.sin(phase)**2  # Creates softer transitions
-        
+ 
         if leg in ['FR', 'FL']:
             # Front legs
             thigh_cmd = self.home_positions[leg]['thigh'] - thigh_offset * math.sin(phase)
@@ -266,13 +222,6 @@ class CPGQuadruped2D:
             thigh_cmd = self.home_positions[leg]['thigh'] - thigh_offset * math.sin(phase + math.pi)
             thigh_cmd += 0.02
 
-        '''
-        if abs(state['body_yaw']) > 0.05:  # If turned
-            if state['body_yaw'] > 0:  # Turned right
-                thigh_cmd += 0.02 if leg in ['FR', 'RR'] else -0.02  # Right legs push more
-            else:  # Turned left
-                thigh_cmd += -0.02 if leg in ['FR', 'RR'] else 0.02
-        '''
         # Calf angle: smooth lifting motion
         calf_offset = self.step_height
         calf_cmd = self.home_positions[leg]['calf'] + calf_offset * math.cos(phase) * 0.7
@@ -287,17 +236,7 @@ class CPGQuadruped2D:
         thigh_cmd += height_correction * 0.1
         calf_cmd += height_correction * 0.5
         
-        '''
-        # Hip joint
-        hip_cmd = pitch_correction * 0.05
-        y_correction = -state['body_y'] * 0.05  # Turn towards Y=0
-        y_correction = np.clip(y_correction, -0.1, 0.1)
-        if leg in ['FR', 'RR']:  # Right legs
-            hip_cmd += y_correction
-        else:  # Left legs
-            hip_cmd -= y_correction
-        '''
-        hip_cmd=0
+        hip_cmd = 0
 
         return hip_cmd, thigh_cmd, calf_cmd
     
@@ -307,8 +246,6 @@ class CPGQuadruped2D:
             return np.array([0, 0.3, -0.5] * 4)
         
         t = state['t']
-        
-        # Calculate dt with upper limit
         if self.last_t > 0:
             dt = min(t - self.last_t, 0.01)
             dt = max(dt, 0.001)
@@ -317,18 +254,15 @@ class CPGQuadruped2D:
         self.last_dt = dt
         self.last_t = t
         
-        # Compute corrections (softer)
         height_correction = self.height_control(state['body_z'], dt) # 0
         pitch_correction = self.pitch_control(state['body_pitch'], state['body_pitch_rate'], dt)
         
-        # Velocity factor (gentle adjustment)
         velocity_error = self.desired_velocity - state['body_vx']
         velocity_factor = 1.0 + np.clip(velocity_error * 0.3, -0.2, 0.3)
         
-        # Build control commands for all legs
+        # control commands for all legs
         controls = []
         for i, leg in enumerate(self.leg_names):
-            # Get raw gait command
             hip_raw, thigh_raw, calf_raw = self.compute_gait(
                 leg, t, height_correction, pitch_correction, velocity_factor, state
             )
@@ -369,18 +303,15 @@ class CPGQuadruped2D:
             print(f"  Pos X: {state['body_x']:6.3f}m | Vel: {state['body_vx']:6.3f}m/s | "
                   f"H: {state['body_z']:6.3f}m | Pitch: {math.degrees(state['body_pitch']):5.1f}°")
             
-            # Show thigh commands (smoothness indicator)
             print(f"  Thigh: FR={controls[1]:6.3f} | FL={controls[4]:6.3f} | "
                   f"RR={controls[7]:6.3f} | RL={controls[10]:6.3f}")
             
-            # Show actual positions
             if 'joints' in state:
                 print(f"  Actual: FR={state['joints']['FR_thigh']:6.3f} | "
                       f"FL={state['joints']['FL_thigh']:6.3f} | "
                       f"RR={state['joints']['RR_thigh']:6.3f} | "
                       f"RL={state['joints']['RL_thigh']:6.3f}")
             
-            # Motion quality indicator
             cmd_rate = np.mean(np.abs(np.diff(controls[1::3]))) if len(controls) > 1 else 0
             smoothness = "Smooth" if cmd_rate < 0.05 else "Jerky" if cmd_rate > 0.15 else "Moderate"
             print(f"  Motion: {smoothness} (Δcmd={cmd_rate:.3f}) | "
@@ -406,19 +337,15 @@ def main():
     try:
         while True:
             try:
-                # Receive state from simulator
                 msg = sock_state.recv(zmq.NOBLOCK)
                 state = controller.parse_state(msg)
                 
                 if state and state['t'] > 0:
-                    # Compute control
                     controls = controller.compute_control(state)
                     
-                    # Send control command
                     control_msg = struct.pack("d" + "f"*12, state['t'], *controls)
                     sock_u.send(control_msg, zmq.NOBLOCK)
                     
-                    # Print status
                     controller.print_status(state, controls)
                     
             except zmq.Again:

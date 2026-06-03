@@ -12,7 +12,6 @@ import control as ct
 import zmq
 import struct
 
-## ZMQ Setup
 ctx = zmq.Context()
 sock = ctx.socket(zmq.PUB)
 sock.bind("tcp://127.0.0.1:5555")
@@ -31,21 +30,18 @@ MODEL = 'quadruped.xml'
 m = mujoco.MjModel.from_xml_path(MODEL)
 d = mujoco.MjData(m)
 
-# Get joint and actuator IDs
 joint_names = [
     'FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint',
     'FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint',
     'RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint',
     'RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint'
 ]
-
 actuator_names = [
     'FR_hip_act', 'FR_thigh_act', 'FR_calf_act',
     'FL_hip_act', 'FL_thigh_act', 'FL_calf_act',
     'RR_hip_act', 'RR_thigh_act', 'RR_calf_act',
     'RL_hip_act', 'RL_thigh_act', 'RL_calf_act'
 ]
-
 joint_ids = {name: m.joint(name).id for name in joint_names}
 actuator_ids = {name: m.actuator(name).id for name in actuator_names}
 
@@ -57,6 +53,23 @@ print(f"Model: {MODEL}")
 print(f"Number of joints: {m.njnt}")
 print(f"Number of actuators: {m.nu}")
 print(f"Number of bodies: {m.nbody}")
+
+def quat_to_euler(w, x, y, z):
+    sinr_cosp = 2.0 * (w * x + y * z)
+    cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+            
+    sinp = 2.0 * (w * y - z * x)
+    if abs(sinp) >= 1:
+        pitch = np.copysign(np.pi / 2, sinp)
+    else:
+        pitch = np.arcsin(sinp)
+            
+    siny_cosp = 2.0 * (w * z + x * y)
+    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+            
+    return roll, pitch, yaw
 
 with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False) as viewer:
     
@@ -76,27 +89,10 @@ with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False)
         dt = current_time - prev_time
         prev_time = current_time
         
-        # Get current state
+        # Get current body state
         trunk_id = m.body('trunk').id
         body_pos = d.xpos[trunk_id].copy()
         body_quat = d.xquat[trunk_id].copy()
-        
-        def quat_to_euler(w, x, y, z):
-            sinr_cosp = 2.0 * (w * x + y * z)
-            cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
-            roll = np.arctan2(sinr_cosp, cosr_cosp)
-            
-            sinp = 2.0 * (w * y - z * x)
-            if abs(sinp) >= 1:
-                pitch = np.copysign(np.pi / 2, sinp)
-            else:
-                pitch = np.arcsin(sinp)
-            
-            siny_cosp = 2.0 * (w * z + x * y)
-            cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
-            yaw = np.arctan2(siny_cosp, cosy_cosp)
-            
-            return roll, pitch, yaw
         
         body_roll, body_pitch, body_yaw = quat_to_euler(
             body_quat[0], body_quat[1], body_quat[2], body_quat[3]
@@ -114,7 +110,6 @@ with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False)
         body_linear_vel = d.cvel[trunk_id][:3]
         body_angular_vel = d.cvel[trunk_id][3:6]
         
-        # Pack and send state via ZMQ
         # Format: time, body_x, body_y, body_z, body_roll, body_pitch, body_yaw,
         #         body_vx, body_vy, body_vz, body_roll_rate, body_pitch_rate, body_yaw_rate,
         #         12 joint positions, 12 joint velocities
@@ -138,7 +133,6 @@ with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False)
         
         sock.send(state_msg, zmq.NOBLOCK)
         
-        # Receive control inputs
         try:
             msg = sock_u.recv(zmq.NOBLOCK)
             unpacked = struct.unpack("d" + "f"*12, msg)
@@ -153,11 +147,7 @@ with mujoco.viewer.launch_passive(m, d, show_left_ui=False, show_right_ui=False)
         # Apply control inputs
         for i, name in enumerate(actuator_names):
             d.ctrl[actuator_ids[name]] = ctrl_inputs[i]
-        
-        # Step simulation
         mujoco.mj_step(m, d)
-        
-        # Sync viewer
         viewer.sync()
         
         # Timing control
