@@ -1,0 +1,37 @@
+services:
+  simulator:
+    build: .
+    working_dir: /app/sim
+    command: xvfb-run -s "-screen 0 1280x720x24" python simulator.py
+    environment:
+      DISPLAY: ${DISPLAY:-host.docker.internal:0.0}
+      QT_X11_NO_MITSHM: "1"
+    volumes:
+      - .:/app
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  controller:
+    build: .
+    working_dir: /app/controllers
+    command: python cpg_controller_walk.py
+    depends_on:
+      - simulator
+    network_mode: service:simulator
+    volumes:
+      - .:/app
+
+  plotter:
+    build: .
+    working_dir: /app/assets
+    command: python rt-plotter.py
+    profiles: ["gui"]
+    depends_on:
+      - simulator
+      - controller
+    network_mode: service:simulator
+    environment:
+      DISPLAY: ${DISPLAY:-host.docker.internal:0.0}
+      QT_X11_NO_MITSHM: "1"
+    volumes:
+      - .:/app
